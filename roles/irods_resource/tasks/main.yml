@@ -141,6 +141,13 @@
   when: not irods_config.stat.exists and not ansible_check_mode
 
 
+- name: Patch irods groupadd error
+  replace:
+    path: /var/lib/irods/scripts/setup_irods.py
+    regexp: "'groupadd', '-r', irods_group"
+    replace: "'groupadd', '-fr', irods_group"
+
+
 - name: Configure iRODS resource server
   become: true
   ansible.builtin.command: python /var/lib/irods/scripts/setup_irods.py --json_configuration_file=/etc/irods/setup_irods_consumer.json
@@ -207,6 +214,29 @@
     enabled: "{{ irods_enable_service }}"
     use: service
   when: irods_service_type == "systemd"
+
+
+- name: My_patch chown /etc/irods
+  file:
+    path: /etc/irods
+    owner: '{{ irods_service_account }}'
+    group: '{{ irods_service_account }}'
+    recurse: true
+
+- name: My_patch chown /var/lib/irods
+  file:
+    path: /var/lib/irods
+    owner: '{{ irods_service_account }}'
+    group: '{{ irods_service_account }}'
+    recurse: true
+
+
+- name: My_patch chown /data
+  file:
+    path: /data
+    owner: '{{ irods_service_account }}'
+    group: '{{ irods_service_account }}'
+    recurse: true
 
 
 - name: Wait until iRODS server is ready to receive requests
@@ -294,7 +324,7 @@
   become: true
   # noqa fqcn[action]
   irods_config:
-    path: '/var/lib/irods/.irods/irods_environment.json'
+    path: "{{ irods_service_account_home | default('/var/lib/irods') }}/.irods/irods_environment.json"
     key: '{{ item.key }}'
     value: '{{ item.value }}'
   with_items:

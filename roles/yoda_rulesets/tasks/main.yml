@@ -91,14 +91,42 @@
   when: "'repo' in item and 'patch' in item"
 
 
-- name: Apply patches to rulesets
-  become_user: "{{ irods_service_account }}"
-  become: true
-  ansible.builtin.command: # noqa command-instead-of-module
-    chdir: "/etc/irods/{{ item.name }}"
-    cmd: "git apply /etc/irods/{{ item.name }}.patch"
-  with_items: "{{ extra_rulesets + core_rulesets }}"
-  when: "'repo' in item and 'patch' in item and item['patch'] not in ['']"
+- name: My_patch irods /etc/irods/yoda-ruleset/vault_archive.py
+  replace:
+    path: /etc/irods/yoda-ruleset/vault_archive.py
+    regexp: "TAPE_ARCHIVE_RESC = \"mockTapeArchive\""
+    replace: "TAPE_ARCHIVE_RESC = \"surfArchive\""
+
+
+# - name: My_patch irods /etc/irods/repo_yoda-ruleset/vault_archive.py
+#   replace:
+#     path: /etc/irods/repo_yoda-ruleset/vault_archive.py
+#     regexp: "TAPE_ARCHIVE_RESC = \"mockTapeArchive\""
+#     replace: "TAPE_ARCHIVE_RESC = \"surfArchive\""
+
+
+- name: My_patch irods /etc/irods/yoda-ruleset/tape_archive.py
+  replace:
+    path: /etc/irods/yoda-ruleset/tape_archive.py
+    regexp: "TAPE_ARCHIVE_RESC = \"testArchiveVault\""
+    replace: "TAPE_ARCHIVE_RESC = \"surfArchive\""
+
+
+# - name: My_patch irods /etc/irods/repo_yoda-ruleset/tape_archive.py
+#   replace:
+#     path: /etc/irods/repo_yoda-ruleset/tape_archive.py
+#     regexp: "TAPE_ARCHIVE_RESC = \"testArchiveVault\""
+#     replace: "TAPE_ARCHIVE_RESC = \"surfArchive\""
+
+
+# - name: Apply patches to rulesets
+#   become_user: "{{ irods_service_account }}"
+#   become: true
+#   ansible.builtin.command: # noqa command-instead-of-module
+#     chdir: "/etc/irods/{{ item.name }}"
+#     cmd: "git apply /etc/irods/{{ item.name }}.patch"
+#   with_items: "{{ extra_rulesets + core_rulesets }}"
+#   when: "'repo' in item and 'patch' in item and item['patch'] not in ['']"
 
 
 - name: Remove temporary rule and cache files

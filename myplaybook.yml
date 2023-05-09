@@ -1,0 +1,34 @@
+---
+- name: file module demo
+  hosts: all
+  tasks:
+    - name: Check out rulesets with local patches from Github
+      become_user: "{{ irods_service_account }}"
+      become: true
+      ansible.builtin.git:
+        repo: "{{ item.repo }}"
+        dest: "/tmp/repo_{{ item.name }}"
+        version: "{{ item.version }}"
+        update: "{{ update_rulesets }}"
+      with_items: "{{ core_rulesets }}"
+      when: "'repo' in item and 'patch' in item"
+      register: patch_repochanges
+
+    - name: Create patch files for rulesets
+      become_user: "{{ irods_service_account }}"
+      become: true
+      ansible.builtin.copy: # noqa template-instead-of-copy
+        dest: "/tmp/irods/{{ item.name }}.patch"
+        content: "{{ item['patch'] }}"
+        mode: '0644'
+      with_items: "{{ core_rulesets }}"
+      when: "'repo' in item and 'patch' in item"
+
+    - name: Apply patches to rulesets
+      become_user: "{{ irods_service_account }}"
+      become: true
+      ansible.builtin.command: # noqa command-instead-of-module
+        chdir: "/tmp/repo_{{ item.name }}"
+        cmd: "git apply /tmp/irods/{{ item.name }}.patch"
+      with_items: "{{ core_rulesets }}"
+      when: "'repo' in item and 'patch' in item"

@@ -23,6 +23,25 @@
     state: absent
 
 
+- name: Download iRODS packages
+  ansible.builtin.get_url:
+    url: "{{ item.url }}"
+    dest: "{{ rpm_dest_dir }}/{{ item.filename }}"
+    mode: 0644
+  with_items:
+      - url: https://github.com/dworkin/irods/releases/download/4.2.11/irods-runtime-4.2.11-1.x86_64.rpm
+        filename: irods-runtime-4.2.11-1.x86_64.rpm
+
+
+- name: Install iRODS packages from downloaded rpm
+  ansible.builtin.yum:
+    name: "{{ rpm_dest_dir }}/{{ item.filename }}"
+    state: present
+  with_items:
+    - url: https://github.com/dworkin/irods/releases/download/4.2.11/irods-runtime-4.2.11-1.x86_64.rpm
+      filename: irods-runtime-4.2.11-1.x86_64.rpm
+
+
 - name: Ensure iRODS runtime is installed
   ansible.builtin.package:
     name: irods-runtime-4.2.11-1

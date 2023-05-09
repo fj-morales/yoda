@@ -91,6 +91,33 @@
   notify: Restart iRODS
 
 
+- name: Download iRODS packages
+  ansible.builtin.get_url:
+    url: "{{ item.url }}"
+    dest: "{{ rpm_dest_dir }}/{{ item.filename }}"
+    mode: 0644
+  with_items:
+      - url: https://github.com/dworkin/irods/releases/download/4.2.11/irods-server-4.2.11-1.x86_64.rpm
+        filename: irods-server-4.2.11-1.x86_64.rpm
+      - url: https://github.com/dworkin/irods/releases/download/4.2.11/irods-runtime-4.2.11-1.x86_64.rpm
+        filename: irods-runtime-4.2.11-1.x86_64.rpm
+      - url: https://github.com/dworkin/irods/releases/download/4.2.11/irods-database-plugin-postgres-4.2.11-1.x86_64.rpm
+        filename: irods-database-plugin-postgres-4.2.11-1.x86_64.rpm
+
+
+- name: Install iRODS packages from downloaded rpm
+  ansible.builtin.yum:
+    name: "{{ rpm_dest_dir }}/{{ item.filename }}"
+    state: present
+  with_items:
+    - url: https://github.com/dworkin/irods/releases/download/4.2.11/irods-server-4.2.11-1.x86_64.rpm
+      filename: irods-server-4.2.11-1.x86_64.rpm
+    - url: https://github.com/dworkin/irods/releases/download/4.2.11/irods-runtime-4.2.11-1.x86_64.rpm
+      filename: irods-runtime-4.2.11-1.x86_64.rpm
+    - url: https://github.com/dworkin/irods/releases/download/4.2.11/irods-database-plugin-postgres-4.2.11-1.x86_64.rpm
+      filename: irods-database-plugin-postgres-4.2.11-1.x86_64.rpm
+
+
 - name: Ensure iRODS iCAT server and plugins are present
   ansible.builtin.package:
     name:
@@ -182,6 +209,13 @@
     timeout: 30
 
 
+- name: Patch irods groupadd error
+  replace:
+    path: /var/lib/irods/scripts/setup_irods.py
+    regexp: "'groupadd', '-r', irods_group"
+    replace: "'groupadd', '-fr', irods_group"
+
+
 - name: Configure iRODS iCAT server
   become: true
   ansible.builtin.command: python /var/lib/irods/scripts/setup_irods.py --json_configuration_file=/etc/irods/setup_irods_provider.json
@@ -212,7 +246,7 @@
   become: true
   # noqa fqcn[action]
   irods_config:
-    path: '/var/lib/irods/.irods/irods_environment.json'
+    path: "{{ irods_service_account_home | default('/var/lib/irods') }}/.irods/irods_environment.json"
     key: 'irods_host'
     value: '{{ irods_icat_fqdn }}'
 
@@ -268,6 +302,29 @@
     enabled: "{{ irods_enable_service }}"
     use: service
   when: irods_service_type == "systemd"
+
+
+- name: My_patch chown /etc/irods
+  file:
+    path: /etc/irods
+    owner: '{{ irods_service_account }}'
+    group: '{{ irods_service_account }}'
+    recurse: true
+
+- name: My_patch chown /var/lib/irods
+  file:
+    path: /var/lib/irods
+    owner: '{{ irods_service_account }}'
+    group: '{{ irods_service_account }}'
+    recurse: true
+
+
+- name: My_patch chown /data
+  file:
+    path: /data
+    owner: '{{ irods_service_account }}'
+    group: '{{ irods_service_account }}'
+    recurse: true
 
 
 - name: Wait until iRODS server is ready to receive requests
@@ -382,7 +439,7 @@
   become: true
   # noqa fqcn[action]
   irods_config:
-    path: '/var/lib/irods/.irods/irods_environment.json'
+    path: "{{ irods_service_account_home | default('/var/lib/irods') }}/.irods/irods_environment.json"
     key: '{{ item.key }}'
     value: '{{ item.value }}'
   with_items:
@@ -417,7 +474,7 @@
 
 - name: Ensure deprecated iRODS environment file for Python client is present
   ansible.builtin.file:
-    path: /var/lib/irods/.irods/python_client_environment.json
+    path: "{{ irods_service_account_home | default('/var/lib/irods') }}/.irods/python_client_environment.json"
     state: absent
 
 
@@ -450,7 +507,7 @@
 
 - name: Ensure iRODS is configured to use SSL connection to database
   community.general.ini_file:
-    path: /var/lib/irods/.odbc.ini
+    path: "{{ irods_service_account_home | default('/var/lib/irods') }}/.odbc.ini"
     section: postgres
     option: 'sslmode'
     value: 'require'
@@ -459,7 +516,7 @@
 
 - name: Ensure iRODS .ssh directory has strict permissions
   ansible.builtin.file:
-    path: /var/lib/irods/.ssh
+    path: "{{ irods_service_account_home | default('/var/lib/irods') }}/.ssh"
     state: directory
     mode: '0700'
     owner: '{{ irods_service_account }}'
@@ -471,10 +528,10 @@
   become: true
   ansible.builtin.template:
     src: id_ed25519.j2
-    dest: '/var/lib/irods/.ssh/id_ed25519'
+    dest: "{{ irods_service_account_home | default('/var/lib/irods') }}/.ssh/id_ed25519"
     owner: '{{ irods_service_account }}'
     mode: '0600'
-  no_log: true
+  no_log: false
   when: upload_priv_key is defined
 
 
@@ -483,7 +540,7 @@
   become: true
   ansible.builtin.shell: "ssh-keyscan {{ yoda_public_host }} >> ~/.ssh/known_hosts"
   args:
-    creates: '/var/lib/irods/.ssh/known_hosts'
+    creates: "{{ irods_service_account_home | default('/var/lib/irods') }}/.ssh/known_hosts"
   when: upload_priv_key is defined
 
 
